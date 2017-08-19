@@ -56,6 +56,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 		--with-openssl=/usr/src/libressl-$LIBRESSL_VERSION \
 		--add-dynamic-module=/usr/src/ngx_headers_more \
 		--add-dynamic-module=/usr/src/ngx_brotli \
+		--add-dynamic-module=/usr/src/ModSecurity-nginx \
 	" \
 	&& addgroup -S nginx \
 	&& adduser -D -S -h /var/cache/nginx -s /sbin/nologin -G nginx nginx \
@@ -80,12 +81,15 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 		libgcc \
 		libstdc++ \
 		libtool \
+		libxml2 \
+		libxml2-dev \
 		libxslt-dev \
 		linux-headers \
 		make \
 		pcre \
 		pcre-dev \
 		perl-dev \
+		pkgconfig \
 		su-exec \
 		tar \
 		tzdata \
@@ -121,8 +125,14 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& (git clone --depth=1 https://github.com/bagder/libbrotli /usr/src/libbrotli \
 		&& cd /usr/src/libbrotli \
 		&& ./autogen.sh && ./configure && make -j$(getconf _NPROCESSORS_ONLN) && make install) \
+	\
+	&& (git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/src/ModSecurity \
+		&& cd /usr/src/ModSecurity \
+		&& git submodule init && git submodule update && ./build.sh && ./configure && make -j$(getconf _NPROCESSORS_ONLN) && make install) \
+	\
 	&& git clone --depth=1 --recurse-submodules https://github.com/google/ngx_brotli /usr/src/ngx_brotli \
 	&& git clone --depth=1 https://github.com/openresty/headers-more-nginx-module /usr/src/ngx_headers_more \
+	&& git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/src/ModSecurity-nginx \
 	\
 	&& tar -zxC /usr/src -f nginx.tar.gz \
 	&& cd /usr/src/nginx-$NGINX_VERSION \
@@ -141,7 +151,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& make install \
 	&& rm -rf /etc/nginx/html/ \
 	&& mkdir /etc/nginx/conf.d/ \
-	&& mkdir -p /usr/share/nginx/html/ \
+	&& mkdir -p /usr/share/nginx/html/ /var/www/ \
 	&& install -m644 html/index.html /usr/share/nginx/html/ \
 	&& install -m644 html/50x.html /usr/share/nginx/html/ \
 	&& install -m755 objs/nginx-debug /usr/sbin/nginx-debug \
@@ -150,6 +160,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& install -m755 objs/ngx_http_geoip_module-debug.so /usr/lib/nginx/modules/ngx_http_geoip_module-debug.so \
 	&& install -m755 objs/ngx_http_perl_module-debug.so /usr/lib/nginx/modules/ngx_http_perl_module-debug.so \
 	&& install -m755 objs/ngx_stream_geoip_module-debug.so /usr/lib/nginx/modules/ngx_stream_geoip_module-debug.so \
+	&& install -m755 objs/ngx_http_modsecurity_module.so /usr/lib/nginx/modules/ngx_http_modsecurity_module.so \
 	&& ln -s ../../usr/lib/nginx/modules /etc/nginx/modules \
 	&& strip /usr/sbin/nginx* \
 	&& strip /usr/lib/nginx/modules/*.so \
@@ -162,7 +173,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& mv /usr/bin/envsubst /tmp/ \
 	\
 	&& runDeps="$( \
-		scanelf --needed --nobanner /usr/sbin/nginx /usr/lib/nginx/modules/*.so /tmp/envsubst \
+		scanelf --needed --nobanner /usr/sbin/nginx /usr/lib/nginx/modules/*.so /tmp/envsubst /usr/local/modsecurity/lib/libmodsecurity.so.3 \
 			| awk '{ gsub(/,/, "\nso:", $2); print "so:" $2 }' \
 			| sort -u \
 			| xargs -r apk info --installed \
@@ -181,8 +192,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 ADD root/ /
 
 RUN \
-	chmod -v +x /etc/cont-init.d/*.sh /etc/services.d/*/run && \
-	mkdir /var/www
+	chmod -v +x /etc/cont-init.d/*.sh /etc/services.d/*/run 
 
 LABEL description="nginx built from source" \
       openssl="LibreSSL $LIBRESSL_VERSION" \

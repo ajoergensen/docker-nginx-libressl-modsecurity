@@ -8,6 +8,7 @@
 - Async I/O using threads support
 - Dynamic TLS records patch support (and configured) - From [Cloudflare][6]
 - [Brotli][7] compression support (and configured)
+- [ModSecurity][2], enabled but in DetectionOnly mode by default
 
 Currently the HPACK patch from Cloudflare is not used because it does not apply cleanly against mainline.
 
@@ -23,6 +24,7 @@ Available tags are `stable` and `mainline`
 - **PGID**: Change the gid of the user running nginx
 - **CHOWN_WWWDIR**: Enable/disable the change of ownership of /var/www to $PUID:$PGID, defaults to TRUE. Note, if /var/www read only this variable will always be FALSE
 - **WORKER_PROCESSES**: Change the value of nginx worker_processes, defaults to auto.
+- **MODSEC_MODE**: Configure the ModSecurity rules engine. Values are On, Off, DetectionOnly. Default is DetectionOnly
 
 ## Other
 
@@ -35,6 +37,7 @@ This image works great with [docker-gen][8] and [docker-letsencrypt-nginx-proxy-
 Originally based on the official nginx Dockerfile & `Wonderfall/boring-nginx` - Forked from [denji/nginx-libressl][1]
 
 [1]: https://github.com/nginx-modules/docker-nginx-libressl/
+[2]: https://modsecurity.org/
 [3]: http://nginx.org/
 [4]: https://libressl.org/
 [5]: https://alpinelinux.org/
